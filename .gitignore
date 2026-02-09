@@ -13,5 +13,8 @@ ReduceR*
 *.o
 send_recv
 reduce
-mat_mult_*
+# Compiled binaries only
+mat_mult*
+!mat_mult*.c
+!mat_mult*.sh
 EOF
