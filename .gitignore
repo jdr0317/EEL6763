@@ -1,0 +1,17 @@
+cat <<EOF > .gitignore
+# VS Code / tooling
+vscode_cli.tar.gz
+.vscode/
+
+# HPC outputs
+*.out
+*.err
+SendRecvR*
+ReduceR*
+
+# Binaries
+*.o
+send_recv
+reduce
+mat_mult_*
+EOF

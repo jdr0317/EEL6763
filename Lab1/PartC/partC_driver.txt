@@ -1,0 +1,9 @@
+Running Part B (Reduce)...
+Done. Generated files:
+ReduceR16N100000
+ReduceR32N100
+ReduceR32N1000
+ReduceR32N10000
+ReduceR32N100000
+ReduceR4N100000
+ReduceR8N100000
