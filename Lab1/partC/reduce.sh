@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# Joseph Regan 
+
 #SBATCH --job-name=lab1C_Reduce
 #SBATCH --account=eel6763
 #SBATCH --qos=eel6763

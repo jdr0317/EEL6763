@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# Joseph Regan 
+
 #SBATCH --job-name=lab1B_sendrecv
 #SBATCH --account=eel6763
 #SBATCH --qos=eel6763

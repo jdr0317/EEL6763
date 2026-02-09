@@ -1,3 +1,6 @@
+/* Joseph Regan */
+/* send_recv.c */
+
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,9 +8,8 @@
 #include <math.h>
 
 #ifndef M_PI
-#define M_PI 3.14159265358979323846 /*Define a constaint for pi*/
+#define M_PI 3.14159265358979323846
 #endif
-
 
 typedef double ttype;
 
@@ -30,6 +32,7 @@ static double g_last_time_spent = 0.0;
 static double g_lower = 0.0;
 static double g_upper = 0.0;
 static long long g_N = 0;
+static double g_partial = 0.0;
 
 static double f(double x)
 {
@@ -67,7 +70,8 @@ double estimate_g(double lower_bound, double upper_bound, long long int N)
     local_sum += f(x);
   }
 
-  return (span / (double)N) * local_sum;
+  g_partial = (span / (double)N) * local_sum;
+  return g_partial;
 }
 
 void collect_results(double *result)
@@ -81,26 +85,46 @@ void collect_results(double *result)
   MPI_Status status;
 
   if (rank == 0) {
+    long long *ns = (long long *)calloc((size_t)size, sizeof(long long));
+    double *parts = (double *)calloc((size_t)size, sizeof(double));
+
+    ns[0] = g_localN;
+    parts[0] = *result;
+
     double total = *result;
+
     for (int src = 1; src < size; src++) {
       long long n_i = 0;
       double part_i = 0.0;
       MPI_Recv(&n_i, 1, MPI_LONG_LONG, src, TAG_N, MPI_COMM_WORLD, &status);
       MPI_Recv(&part_i, 1, MPI_DOUBLE, src, TAG_V, MPI_COMM_WORLD, &status);
+      ns[src] = n_i;
+      parts[src] = part_i;
       total += part_i;
     }
+
     *result = total;
 
     struct timespec end = now();
     g_last_time_spent = tdiff(g_begin, end);
 
+    for (int src = 1; src < size; src++) {
+      printf("Master: received from rank %d localN=%lld partial=%.12f\n", src, ns[src], parts[src]);
+    }
+    printf("Master: localN=%lld partial=%.12f\n", ns[0], parts[0]);
+    printf("Master: total estimate=%.12f\n", *result);
+
     printf("SendRecv Monte Carlo Integration\n");
     printf("a=%.6f b=%.6f N=%lld R=%d\n", g_lower, g_upper, g_N, size);
     printf("estimate=%.12f\n", *result);
     printf("time_spent=%.8f sec\n", g_last_time_spent);
+
+    free(ns);
+    free(parts);
   } else {
     MPI_Send(&g_localN, 1, MPI_LONG_LONG, 0, TAG_N, MPI_COMM_WORLD);
     MPI_Send(result, 1, MPI_DOUBLE, 0, TAG_V, MPI_COMM_WORLD);
+    printf("Worker rank %d: localN=%lld partial=%.12f\n", rank, g_localN, *result);
   }
 }
 

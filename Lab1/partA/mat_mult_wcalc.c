@@ -1,4 +1,5 @@
-/*mat_mult.c */
+/* Joseph Regan */
+/*mat_mult_wcalc.c */
  
 #include "mpi.h"
 #include <stdio.h>
@@ -50,18 +51,24 @@ int	A[NRA][NCA],         /* matrix A to be multiplied */
 MPI_Status status;
 
 //clock_t begin, end;
-  struct timespec begin, end;
-  double time_spent;
-    
-MPI_Init(&argc,&argv);
-MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
-MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
-if (numtasks < 2 ) {
-  printf("Need at least two MPI tasks. Quitting...\n");
-  MPI_Abort(MPI_COMM_WORLD, rc);
-  exit(1);
-  }
-numworkers = numtasks-1;
+   struct timespec begin, end;
+   double time_spent;
+   double *wcalcTimes;
+   double wcalcSum, wcalcMax;
+      
+   MPI_Init(&argc,&argv);
+   MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
+   MPI_Comm_size(MPI_COMM_WORLD,&numtasks);
+   if (numtasks < 2 ) {
+      printf("Need at least two MPI tasks. Quitting...\n");
+      MPI_Abort(MPI_COMM_WORLD, rc);
+      exit(1);
+   }
+   numworkers = numtasks-1;
+ 
+   wcalcTimes = NULL;
+   wcalcSum = 0.0;
+   wcalcMax = 0.0;
 
 /**************************** master task ************************************/
    if (taskid == MASTER)
@@ -102,6 +109,12 @@ numworkers = numtasks-1;
         printf("\n");        
       }     
 
+      wcalcTimes = (double*)calloc(numtasks, sizeof(double));
+      if (wcalcTimes == NULL) {
+        printf("calloc failed\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+        exit(1);
+      }
 
       /* Send matrix data to the worker tasks */
       averow = NRA/numworkers;
@@ -133,6 +146,7 @@ numworkers = numtasks-1;
          MPI_Recv(&rows, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
          MPI_Recv(&C[offset][0], rows*NCB, MPI_INT, source, mtype, 
                   MPI_COMM_WORLD, &status);
+         MPI_Recv(&wcalcTimes[source], 1, MPI_DOUBLE, source, mtype, MPI_COMM_WORLD, &status);
          printf("Received results from task %d\n",source);
       }
 
@@ -154,7 +168,18 @@ numworkers = numtasks-1;
       printf("\n******************************************************\n");
       printf ("\n");
       printf("total time: %.8f sec\n", time_spent);
+      printf("\nWorker wcalcTime values:\n");
+      wcalcSum = 0.0;
+      wcalcMax = 0.0;
+      for (i=1; i<=numworkers; i++) {
+        printf("rank %d: %.8f sec\n", i, wcalcTimes[i]);
+        wcalcSum += wcalcTimes[i];
+        if (i==1 || wcalcTimes[i] > wcalcMax) wcalcMax = wcalcTimes[i];
+      }
+      printf("max wcalcTime: %.8f sec\n", wcalcMax);
+      printf("sum wcalcTime: %.8f sec\n", wcalcSum);
       printf ("\n");
+      if (wcalcTimes != NULL) free(wcalcTimes);
    }
 
 
@@ -167,6 +192,9 @@ numworkers = numtasks-1;
       MPI_Recv(&A, rows*NCA, MPI_INT, MASTER, mtype, MPI_COMM_WORLD, &status);
       MPI_Recv(&B, NRB*NCB, MPI_INT, MASTER, mtype, MPI_COMM_WORLD, &status);
             
+       struct timespec wbegin, wend;
+       double wcalcTime;
+       wbegin = now();
       for (i=0; i<rows; i++)
          for (j=0; j<NCB; j++)
          {
@@ -174,11 +202,14 @@ numworkers = numtasks-1;
            for (k=0; k<NCA; k++)            
               C[i][j] = C[i][j] + A[i][k] * B[k][j];
          }
+       wend = now();
+       wcalcTime = tdiff(wbegin, wend);
          
       mtype = FROM_WORKER;
       MPI_Send(&offset, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD);
       MPI_Send(&rows, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD);
       MPI_Send(&C, rows*NCB, MPI_INT, MASTER, mtype, MPI_COMM_WORLD);
+       MPI_Send(&wcalcTime, 1, MPI_DOUBLE, MASTER, mtype, MPI_COMM_WORLD);
    }
    MPI_Finalize();
 }

@@ -1,3 +1,6 @@
+/* Joseph Regan */
+/* reduce.c */
+
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +32,7 @@ static double g_last_time_spent = 0.0;
 static double g_lower = 0.0;
 static double g_upper = 0.0;
 static long long g_N = 0;
+static double g_partial = 0.0;
 
 static double f(double x)
 {
@@ -66,7 +70,8 @@ double estimate_g(double lower_bound, double upper_bound, long long int N)
     local_sum += f(x);
   }
 
-  return (span / (double)N) * local_sum;
+  g_partial = (span / (double)N) * local_sum;
+  return g_partial;
 }
 
 void collect_results(double *result)
@@ -83,10 +88,15 @@ void collect_results(double *result)
     struct timespec end = now();
     g_last_time_spent = tdiff(g_begin, end);
 
+    printf("Master: localN=%lld partial=%.12f\n", g_localN, g_partial);
+    printf("Master: total estimate=%.12f\n", *result);
+
     printf("Reduce Monte Carlo Integration\n");
     printf("a=%.6f b=%.6f N=%lld R=%d\n", g_lower, g_upper, g_N, size);
     printf("estimate=%.12f\n", *result);
     printf("time_spent=%.8f sec\n", g_last_time_spent);
+  } else {
+    printf("Worker rank %d: localN=%lld partial=%.12f\n", rank, g_localN, *result);
   }
 }
 
